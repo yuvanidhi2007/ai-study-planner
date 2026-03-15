@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Study Dependency Graph</title>
+
+<link rel="stylesheet" href="/static/style.css">
+
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+<style>
+
+textarea{
+width:80%;
+height:150px;
+font-size:16px;
+background:#020617;
+color:white;
+border:1px solid #334155;
+border-radius:6px;
+padding:10px;
+}
+
+#network{
+width:100%;
+height:500px;
+border:1px solid #334155;
+margin-top:20px;
+border-radius:10px;
+background:#020617;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="navbar">
+<div class="logo">AI Study Planner</div>
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Study Dependency Graph</h2>
+
+<p>
+Visualize subject prerequisites using a Directed Acyclic Graph (DAG)
+</p>
+
+<br>
+
+<p>Enter subjects (one per line)</p>
+
+<textarea id="subjects">
+
+Machine Learning
+Deep Learning
+Operating Systems
+
+</textarea>
+
+<br><br>
+
+<button onclick="generateGraph()">
+Generate Study Graph
+</button>
+
+<button onclick="location.href='/dashboard'">
+Back to Dashboard
+</button>
+
+<div id="network"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const dependencyDB = {
+
+"machine learning":["probabilistic reasoning","fundamentals of ai"],
+
+"deep learning":["machine learning"],
+
+"natural language processing":["machine learning"],
+
+"computer vision":["machine learning"],
+
+"reinforcement learning":["deep learning"],
+
+"big data analytics":["machine learning","database systems"],
+
+"operating systems":["data structures"],
+
+"data structures":["programming"],
+
+"design and analysis of algorithms":["data structures"]
+
+}
+
+function generateGraph(){
+
+let text=document.getElementById("subjects").value
+
+let subjects=text.split("\n")
+.map(s=>s.trim().toLowerCase())
+.filter(s=>s)
+
+let nodes={}
+let edges=[]
+let id=1
+
+function getNode(name){
+
+if(!nodes[name]){
+nodes[name]=id++
+}
+
+return nodes[name]
+
+}
+
+function addDependencies(subject){
+
+let nodeID=getNode(subject)
+
+if(dependencyDB[subject]){
+
+dependencyDB[subject].forEach(prereq=>{
+
+let prereqID=getNode(prereq)
+
+edges.push({from:prereqID,to:nodeID})
+
+if(!nodes[prereq]){
+addDependencies(prereq)
+}
+
+})
+
+}
+
+}
+
+subjects.forEach(s=>{
+
+addDependencies(s)
+
+})
+
+let nodeArray=[]
+
+for(let n in nodes){
+
+nodeArray.push({
+
+id:nodes[n],
+label:n
+
+})
+
+}
+
+let container=document.getElementById("network")
+
+let data={
+
+nodes:new vis.DataSet(nodeArray),
+
+edges:new vis.DataSet(edges)
+
+}
+
+let options={
+
+layout:{
+hierarchical:{
+direction:"LR",
+sortMethod:"directed",
+levelSeparation:150
+}
+},
+
+edges:{
+arrows:"to"
+},
+
+physics:false
+
+}
+
+new vis.Network(container,data,options)
+
+}
+
+</script>
+
+</body>
+</html>
