@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Study Planner</title>
+<link rel="stylesheet" href="/static/style.css">
+
+</head>
+
+<body>
+
+<div class="navbar">
+<div class="logo">AI Study Planner</div>
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Study Planner</h2>
+
+<input id="taskName" placeholder="Task">
+
+<select id="priority">
+<option value="3">High</option>
+<option value="2">Medium</option>
+<option value="1">Low</option>
+</select>
+
+<button onclick="addTask()">Add Task</button>
+
+<ul id="taskList"></ul>
+
+<button onclick="location.href='/dashboard'">Back</button>
+
+</div>
+
+</div>
+
+<script src="/static/planner.js"></script>
+
+</body>
+</html>
