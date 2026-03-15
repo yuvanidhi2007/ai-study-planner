@@ -3,30 +3,9 @@
 
 <head>
 
-<title>Focus Score Tracker</title>
+<title>Focus Tracker</title>
 
 <link rel="stylesheet" href="/static/style.css">
-
-<style>
-
-#score{
-font-size:70px;
-color:#22c55e;
-margin-top:30px;
-}
-
-#status{
-margin-top:20px;
-font-size:18px;
-color:#cbd5f5;
-}
-
-.info{
-margin-top:30px;
-color:#94a3b8;
-}
-
-</style>
 
 </head>
 
@@ -40,24 +19,14 @@ color:#94a3b8;
 
 <div class="card">
 
-<h1>Focus Tracker</h1>
-
-<p>Real-time focus monitoring using sliding window algorithm</p>
+<h1>Focus Score</h1>
 
 <div id="score">0</div>
 
-<div id="status">
-Start typing or moving the mouse to generate activity
-</div>
-
-<div class="info">
-Focus score updates every few seconds based on your activity
-</div>
-
-<br>
+<p id="status">Start typing or moving the mouse</p>
 
 <button onclick="location.href='/dashboard'">
-Back to Dashboard
+Back
 </button>
 
 </div>
@@ -67,5 +36,4 @@ Back to Dashboard
 <script src="/static/focus.js"></script>
 
 </body>
-
 </html>
