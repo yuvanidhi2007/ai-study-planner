@@ -1,89 +1,237 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Task Flow Planner</title>
+<meta charset="UTF-8">
+<title>Task Scheduler</title>
 
-    <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: slateblue;
-            color: white;
-            text-align: center;
-            margin: 0;
-            padding: 20px;
-        }
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+}
 
-        h1 {
-            color: black;
-        }
+body {
+    background: #0f172a;
+    color: white;
+    padding: 30px;
+}
 
-        .container {
-            max-width: 600px;
-            margin: auto;
-        }
+/* Container */
+.container {
+    max-width: 700px;
+    margin: auto;
+}
 
-        input, button {
-            padding: 10px;
-            margin: 5px;
-            border-radius: 8px;
-            border: none;
-        }
+/* Header */
+h1 {
+    margin-bottom: 20px;
+}
 
-        input {
-            width: 40%;
-        }
+/* Input box */
+.input-box {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
 
-        button {
-            background-color: black;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
+input {
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #1e293b;
+    color: white;
+}
 
-        button:hover {
-            background-color: #C71585;;
-        }
+button {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #38bdf8;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+}
 
-        .task-card {
-            background: white;
-            color: black;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 12px;
-            text-align: left;
-        }
+button:hover {
+    background: #0ea5e9;
+}
 
-        .deadline {
-            font-size: 14px;
-            color: #444;
-        }
+/* Task card */
+.task-card {
+    background: rgba(255,255,255,0.05);
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    border-left: 6px solid #22c55e;
+    transition: 0.3s;
+}
 
-        .countdown {
-            font-size: 14px;
-            color: red;
-        }
-    </style>
+.task-card:hover {
+    transform: translateY(-4px);
+}
+
+/* Text */
+.task-name {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.deadline {
+    font-size: 13px;
+    color: #cbd5f5;
+}
+
+.countdown {
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+/* Priority colors */
+.low { border-color: #22c55e; }
+.medium { border-color: #facc15; }
+.high { border-color: #ef4444; }
+
+</style>
 </head>
 
 <body>
 
-<h1>Task Flow Planner</h1>
-
 <div class="container">
 
-    <input id="taskName" placeholder="Task name">
-    <input id="deadline" type="datetime-local">
-    <input id="importance" type="number" min="1" max="5" placeholder="Importance (1-5)">
+    <h1>Task Scheduler</h1>
 
-    <br>
-
-    <button onclick="addTask()">Add Task</button>
+    <div class="input-box">
+        <input id="taskName" placeholder="Task name">
+        <input id="deadline" type="datetime-local">
+        <input id="importance" type="number" min="1" max="5" placeholder="Importance">
+        <button onclick="addTask()">Add</button>
+    </div>
 
     <div id="taskList"></div>
 
 </div>
 
-<script src="priorityqueue.js"></script>
+<script>
+
+// ===== YOUR ORIGINAL LOGIC (UPGRADED UI ONLY) =====
+
+class Task {
+    constructor(name, deadline, importance) {
+        this.name = name;
+        this.deadline = deadline ? new Date(deadline) : null;
+        this.importance = importance;
+        this.priority = this.calculatePriority();
+    }
+
+    calculatePriority() {
+        let urgency = 0;
+
+        if (this.deadline) {
+            const now = new Date();
+            const timeLeft = (this.deadline - now) / (1000 * 60 * 60);
+
+            if (timeLeft <= 0) urgency = 10;
+            else urgency = 1 / timeLeft;
+        }
+
+        return (this.importance * 3) + (urgency * 5);
+    }
+}
+
+class MaxHeap {
+    constructor() {
+        this.heap = [];
+    }
+
+    insert(task) {
+        this.heap.push(task);
+        this.heap.sort((a, b) => b.priority - a.priority);
+    }
+
+    rebuildHeap() {
+        this.heap.forEach(t => t.priority = t.calculatePriority());
+        this.heap.sort((a, b) => b.priority - a.priority);
+    }
+}
+
+const taskQueue = new MaxHeap();
+
+function formatTime(date) {
+    return date.toLocaleString();
+}
+
+function getCountdown(deadline) {
+    const now = new Date();
+    const diff = deadline - now;
+
+    if (diff <= 0) return "Overdue 🔴";
+
+    const h = Math.floor(diff / (1000*60*60));
+    const m = Math.floor((diff/(1000*60))%60);
+    const s = Math.floor((diff/1000)%60);
+
+    return `${h}h ${m}m ${s}s`;
+}
+
+function getPriorityClass(priority){
+    if(priority > 8) return "high";
+    if(priority > 4) return "medium";
+    return "low";
+}
+
+function addTask() {
+    const name = document.getElementById("taskName").value.trim();
+    const deadline = document.getElementById("deadline").value;
+    const importance = parseInt(document.getElementById("importance").value);
+
+    if (!name || isNaN(importance)) return alert("Fill all fields");
+
+    const task = new Task(name, deadline, importance);
+    taskQueue.insert(task);
+
+    updateUI();
+}
+
+function updateUI() {
+    const container = document.getElementById("taskList");
+    container.innerHTML = "";
+
+    taskQueue.heap.forEach(task => {
+
+        const div = document.createElement("div");
+
+        const cls = getPriorityClass(task.priority);
+
+        div.className = "task-card " + cls;
+
+        let deadlineHTML = "";
+
+        if (task.deadline) {
+            deadlineHTML = `
+                <div class="deadline">Due: ${formatTime(task.deadline)}</div>
+                <div class="countdown">${getCountdown(task.deadline)}</div>
+            `;
+        }
+
+        div.innerHTML = `
+            <div class="task-name">${task.name}</div>
+            ${deadlineHTML}
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+// live update
+setInterval(() => {
+    taskQueue.rebuildHeap();
+    updateUI();
+}, 1000);
+
+</script>
 
 </body>
 </html>
