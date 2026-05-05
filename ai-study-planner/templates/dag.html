@@ -1,202 +1,343 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-
-<title>Study Dependency Graph</title>
-
-<link rel="stylesheet" href="/static/style.css">
+<title>Learning Path (DAG)</title>
 
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
 <style>
-
-textarea{
-width:80%;
-height:150px;
-font-size:16px;
-background:#020617;
-color:white;
-border:1px solid #334155;
-border-radius:6px;
-padding:10px;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
 }
 
-#network{
-width:100%;
-height:500px;
-border:1px solid #334155;
-margin-top:20px;
-border-radius:10px;
-background:#020617;
+body {
+    background: #0f172a;
+    color: white;
+    padding: 20px;
+}
+
+/* Container */
+.container {
+    max-width: 1000px;
+    margin: auto;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    padding: 25px;
+    border-radius: 20px;
+}
+
+/* Title */
+h2 {
+    margin-bottom: 15px;
+}
+
+/* Textarea */
+textarea {
+    width: 100%;
+    height: 140px;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    background: #1e293b;
+    color: white;
+}
+
+/* Buttons */
+button {
+    margin-top: 10px;
+    margin-right: 10px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #38bdf8;
+    color: black;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #0ea5e9;
+}
+
+/* Network */
+#network {
+    height: 500px;
+    margin-top: 20px;
+    border-radius: 12px;
+    background: #020617;
+}
+
+/* Order */
+#order {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #38bdf8;
+}
+
+/* Legend */
+.legend {
+    margin-top: 10px;
+}
+
+.legend span {
+    padding: 5px 12px;
+    border-radius: 6px;
+    margin-right: 10px;
+}
+
+.locked { background:#64748b; }
+.unlocked { background:#22c55e; }
+.done { background:#3b82f6; }
+
+/* Error */
+.error {
+    color: #ef4444;
 }
 
 </style>
-
 </head>
 
 <body>
 
-<div class="navbar">
-<div class="logo">AI Study Planner</div>
-</div>
-
 <div class="container">
 
-<div class="card">
+<h2>Learning Path Generator (DAG)</h2>
 
-<h2>Study Dependency Graph</h2>
-
-<p>
-Visualize subject prerequisites using a Directed Acyclic Graph (DAG)
-</p>
-
-<br>
-
-<p>Enter subjects (one per line)</p>
+<p>Format: Subject : prereq1, prereq2</p>
 
 <textarea id="subjects">
-
-Machine Learning
-Deep Learning
-Operating Systems
-
+Machine Learning : Probability
+Deep Learning : Machine Learning
+Probability :
+Operating Systems : Data Structures
+Data Structures :
 </textarea>
 
-<br><br>
+<br>
+<button onclick="generateGraph()">Generate</button>
+<button onclick="resetProgress()">Reset</button>
 
-<button onclick="generateGraph()">
-Generate Study Graph
-</button>
+<div id="order"></div>
 
-<button onclick="location.href='/dashboard'">
-Back to Dashboard
-</button>
+<div class="legend">
+<span class="locked">Locked</span>
+<span class="unlocked">Unlocked</span>
+<span class="done">Completed</span>
+</div>
 
 <div id="network"></div>
 
 </div>
 
-</div>
-
 <script>
 
-const dependencyDB = {
+// ===== SAME LOGIC (UI UPGRADED ONLY) =====
 
-"machine learning":["probabilistic reasoning","fundamentals of ai"],
+let completed = new Set(JSON.parse(localStorage.getItem("progress") || "[]"));
 
-"deep learning":["machine learning"],
+let adjacency = {};
+let reverseAdj = {};
+let nodes = {};
+let edges = [];
 
-"natural language processing":["machine learning"],
+let container = document.getElementById("network");
 
-"computer vision":["machine learning"],
-
-"reinforcement learning":["deep learning"],
-
-"big data analytics":["machine learning","database systems"],
-
-"operating systems":["data structures"],
-
-"data structures":["programming"],
-
-"design and analysis of algorithms":["data structures"]
-
-}
+let network = new vis.Network(container, {
+    nodes: new vis.DataSet([]),
+    edges: new vis.DataSet([])
+},{
+    layout:{hierarchical:{direction:"LR"}},
+    edges:{arrows:"to", color:"#38bdf8"},
+    physics:false
+});
 
 function generateGraph(){
 
-let text=document.getElementById("subjects").value
+adjacency = {};
+reverseAdj = {};
+nodes = {};
+edges = [];
 
-let subjects=text.split("\n")
-.map(s=>s.trim().toLowerCase())
-.filter(s=>s)
+let input = document.getElementById("subjects").value;
 
-let nodes={}
-let edges=[]
-let id=1
+if(!input.trim()){
+    showError("Input cannot be empty");
+    return;
+}
+
+let lines = input.split("\n").map(l=>l.trim()).filter(l=>l);
+
+let id = 1;
 
 function getNode(name){
-
-if(!nodes[name]){
-nodes[name]=id++
+    name = name.toLowerCase();
+    if(!nodes[name]) nodes[name] = id++;
+    return nodes[name];
 }
 
-return nodes[name]
+// BUILD GRAPH
+for(let line of lines){
 
+    if(!line.includes(":")){
+        showError("Invalid format");
+        return;
+    }
+
+    let [subject, prereqStr] = line.split(":");
+    subject = subject.trim().toLowerCase();
+
+    getNode(subject);
+
+    adjacency[subject] = adjacency[subject] || [];
+    reverseAdj[subject] = reverseAdj[subject] || [];
+
+    if(prereqStr){
+        let prereqs = prereqStr.split(",");
+
+        for(let p of prereqs){
+            let pre = p.trim().toLowerCase();
+            if(pre){
+                getNode(pre);
+
+                adjacency[pre] = adjacency[pre] || [];
+                adjacency[pre].push(subject);
+
+                reverseAdj[subject].push(pre);
+
+                edges.push({
+                    from:nodes[pre],
+                    to:nodes[subject]
+                });
+            }
+        }
+    }
 }
 
-function addDependencies(subject){
+// DFS cycle detection
+let visited = {}, stack = {};
 
-let nodeID=getNode(subject)
+function dfs(node){
+    visited[node] = true;
+    stack[node] = true;
 
-if(dependencyDB[subject]){
+    for(let nei of (adjacency[node]||[])){
+        if(!visited[nei] && dfs(nei)) return true;
+        if(stack[nei]) return true;
+    }
 
-dependencyDB[subject].forEach(prereq=>{
-
-let prereqID=getNode(prereq)
-
-edges.push({from:prereqID,to:nodeID})
-
-if(!nodes[prereq]){
-addDependencies(prereq)
+    stack[node] = false;
+    return false;
 }
 
-})
-
+for(let n in adjacency){
+    if(!visited[n]){
+        if(dfs(n)){
+            showError("Cycle detected!");
+            return;
+        }
+    }
 }
 
+// Kahn's algorithm
+let indegree = {};
+for(let n in adjacency) indegree[n] = 0;
+
+for(let n in adjacency){
+    adjacency[n].forEach(v => indegree[v]++);
 }
 
-subjects.forEach(s=>{
+let queue = [];
+for(let n in indegree){
+    if(indegree[n] === 0) queue.push(n);
+}
 
-addDependencies(s)
+let topo = [];
 
-})
+while(queue.length){
+    let cur = queue.shift();
+    topo.push(cur);
 
-let nodeArray=[]
+    for(let nei of (adjacency[cur]||[])){
+        indegree[nei]--;
+        if(indegree[nei] === 0) queue.push(nei);
+    }
+}
+
+document.getElementById("order").innerHTML =
+"Study Order: " + topo.join(" → ");
+
+// Node coloring
+function isUnlocked(node){
+    return (reverseAdj[node]||[]).every(p => completed.has(p));
+}
+
+let nodeArray = [];
 
 for(let n in nodes){
 
-nodeArray.push({
+    let color = "#64748b";
 
-id:nodes[n],
-label:n
+    if(isUnlocked(n)) color = "#22c55e";
+    if(completed.has(n)) color = "#3b82f6";
 
-})
-
+    nodeArray.push({
+        id:nodes[n],
+        label:n,
+        shape:"box",
+        color:{background:color},
+        font:{color:"white"}
+    });
 }
 
-let container=document.getElementById("network")
+// update graph
+network.setData({
+    nodes:new vis.DataSet(nodeArray),
+    edges:new vis.DataSet(edges)
+});
 
-let data={
-
-nodes:new vis.DataSet(nodeArray),
-
-edges:new vis.DataSet(edges)
-
+clearError();
 }
 
-let options={
+// click interaction
+network.on("click", function(params){
 
-layout:{
-hierarchical:{
-direction:"LR",
-sortMethod:"directed",
-levelSeparation:150
+    if(params.nodes.length === 0) return;
+
+    let idClicked = params.nodes[0];
+    let name = Object.keys(nodes).find(k => nodes[k] === idClicked);
+
+    if(completed.has(name)){
+        completed.delete(name);
+    }
+    else{
+        if(!(reverseAdj[name]||[]).every(p => completed.has(p))){
+            alert("Finish prerequisites first");
+            return;
+        }
+        completed.add(name);
+    }
+
+    localStorage.setItem("progress", JSON.stringify([...completed]));
+    generateGraph();
+});
+
+// reset
+function resetProgress(){
+    completed = new Set();
+    localStorage.removeItem("progress");
+    generateGraph();
 }
-},
 
-edges:{
-arrows:"to"
-},
-
-physics:false
-
+// error
+function showError(msg){
+    document.getElementById("order").innerHTML =
+    "<span class='error'>" + msg + "</span>";
 }
 
-new vis.Network(container,data,options)
-
-}
+function clearError(){}
 
 </script>
 
