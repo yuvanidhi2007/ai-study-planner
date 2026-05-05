@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Focus Monitor</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: slateblue; /* changed */
+    color: white;
+    text-align: center;
+}
+
+.container {
+    margin-top: 100px;
+}
+
+.card {
+    margin: 20px auto;
+    padding: 20px;
+    width: 250px;
+    background: #222;
+    border-radius: 10px;
+}
+
+/* warning */
+#warning {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: red;
+    padding: 15px 25px;
+    border-radius: 10px;
+    display: none;
+    font-weight: bold;
+}
+
+/* blackout */
+#blackout {
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:black;
+    display:none;
+    z-index:999;
+}
+
+/* popup */
+#popup {
+    position: fixed;
+    top:50%;
+    left:50%;
+    transform: translate(-50%, -50%);
+    background:#222;
+    padding:25px;
+    border-radius:10px;
+    display:none;
+    z-index:1000;
+}
+
+button {
+    margin:10px;
+    padding:10px 15px;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+.yes { background:#4CAF50; color:white; }
+.no { background:#f44336; color:white; }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>Focus Monitor</h1>
+
+    <div class="card">
+        <p>Focus Score</p>
+        <h2 id="score">0</h2>
+    </div>
+
+    <div class="card">
+        <p>Status</p>
+        <h3 id="status">Tracking...</h3>
+    </div>
+</div>
+
+<div id="warning">Stay Focused</div>
+
+<div id="blackout"></div>
+
+<div id="popup">
+    <p>You seem distracted.<br>
+    Want to take a break for a few minutes and then continue?</p>
+    <button class="yes" onclick="takeBreak()">Yes</button>
+    <button class="no" onclick="continueWork()">No</button>
+</div>
+
+<script>
+
+// =========================
+// TRACKING
+// =========================
+let eventsArr = [];
+const WINDOW = 30000;
+let lastMouseRecorded = 0;
+
+// =========================
+// CONTROL
+// =========================
+let warningActive = false;
+let warningStartTime = 0;
+
+let blackoutActive = false;
+let locked = false;
+
+let tabInactive = false;
+
+// =========================
+// ELEMENTS
+// =========================
+const scoreEl = document.getElementById("score");
+const statusEl = document.getElementById("status");
+const warning = document.getElementById("warning");
+const blackout = document.getElementById("blackout");
+const popup = document.getElementById("popup");
+
+// =========================
+// ACTIVITY
+// =========================
+function recordActivity(){
+
+    if(blackoutActive || locked) return;
+
+    const now = Date.now();
+
+    eventsArr.push(now);
+
+    while(eventsArr.length && now - eventsArr[0] > WINDOW){
+        eventsArr.shift();
+    }
+
+    if(warningActive){
+        hideWarning();
+    }
+}
+
+// =========================
+// EVENTS
+// =========================
+document.addEventListener("keydown", recordActivity);
+
+document.addEventListener("mousemove", () => {
+    const now = Date.now();
+    if(now - lastMouseRecorded > 1000){
+        recordActivity();
+        lastMouseRecorded = now;
+    }
+});
+
+// =========================
+// TAB SWITCH DETECTION
+// =========================
+document.addEventListener("visibilitychange", () => {
+
+    if(document.hidden){
+        tabInactive = true;
+    } else {
+        tabInactive = false;
+        recordActivity(); // regain focus
+    }
+});
+
+// =========================
+// WARNING
+// =========================
+function showWarning(){
+    if(warningActive) return;
+
+    warningActive = true;
+    warningStartTime = Date.now();
+}
+
+function hideWarning(){
+    warning.style.display = "none";
+    warningActive = false;
+}
+
+// =========================
+// BLACKOUT
+// =========================
+function showBlackout(){
+    blackout.style.display = "block";
+    popup.style.display = "block";
+    blackoutActive = true;
+}
+
+function hideBlackout(){
+    blackout.style.display = "none";
+    popup.style.display = "none";
+    blackoutActive = false;
+}
+
+// =========================
+// USER ACTIONS
+// =========================
+function takeBreak(){
+    locked = true;
+
+    popup.innerHTML = "<h3>Break Mode Active</h3><p>Returning in 5 minutes...</p>";
+
+    setTimeout(()=>{
+        locked = false;
+        hideBlackout();
+        hideWarning();
+    }, 300000);
+}
+
+function continueWork(){
+    hideBlackout();
+    hideWarning();
+    warningStartTime = Date.now();
+}
+
+// =========================
+// LOOP
+// =========================
+setInterval(()=>{
+
+    if(locked) return;
+
+    const now = Date.now();
+
+    while(eventsArr.length && now - eventsArr[0] > WINDOW){
+        eventsArr.shift();
+    }
+
+    let events = eventsArr.length;
+
+    // reduce score if tab inactive
+    if(tabInactive) events = Math.max(0, events - 3);
+
+    let focusScore = Math.min(10, Math.floor(events / 2));
+
+    scoreEl.innerText = focusScore;
+    statusEl.innerText = tabInactive ? "Tab inactive ⚠️" : "Events: " + events;
+
+    let lastEventTime = eventsArr.length ? eventsArr[eventsArr.length - 1] : 0;
+    let idleTime = now - lastEventTime;
+
+    // trigger warning
+    if(idleTime > 6000 && !warningActive){
+        showWarning();
+    }
+
+    // ⏳ COUNTDOWN DISPLAY
+    if(warningActive){
+        let remaining = Math.max(0, 60 - Math.floor((now - warningStartTime)/1000));
+        warning.style.display = "block";
+        warning.innerText = "Stay Focused - Break in " + remaining + "s";
+    }
+
+    // blackout after 60 sec
+    if(warningActive && (now - warningStartTime > 60000) && !blackoutActive){
+        showBlackout();
+    }
+
+}, 1000);
+
+</script>
+
+</body>
+</html>
