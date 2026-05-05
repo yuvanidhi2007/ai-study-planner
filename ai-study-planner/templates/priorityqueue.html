@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task Flow Planner</title>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: slateblue;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: black;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        input {
+            width: 40%;
+        }
+
+        button {
+            background-color: black;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #C71585;;
+        }
+
+        .task-card {
+            background: white;
+            color: black;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            text-align: left;
+        }
+
+        .deadline {
+            font-size: 14px;
+            color: #444;
+        }
+
+        .countdown {
+            font-size: 14px;
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Task Flow Planner</h1>
+
+<div class="container">
+
+    <input id="taskName" placeholder="Task name">
+    <input id="deadline" type="datetime-local">
+    <input id="importance" type="number" min="1" max="5" placeholder="Importance (1-5)">
+
+    <br>
+
+    <button onclick="addTask()">Add Task</button>
+
+    <div id="taskList"></div>
+
+</div>
+
+<script src="priorityqueue.js"></script>
+
+</body>
+</html>
