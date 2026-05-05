@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Learning Path (DAG)</title>
+
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+    background: #0f172a;
+    color: white;
+    padding: 20px;
+}
+
+/* Container */
+.container {
+    max-width: 1000px;
+    margin: auto;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    padding: 25px;
+    border-radius: 20px;
+}
+
+/* Title */
+h2 {
+    margin-bottom: 15px;
+}
+
+/* Textarea */
+textarea {
+    width: 100%;
+    height: 140px;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    background: #1e293b;
+    color: white;
+}
+
+/* Buttons */
+button {
+    margin-top: 10px;
+    margin-right: 10px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #38bdf8;
+    color: black;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #0ea5e9;
+}
+
+/* Network */
+#network {
+    height: 500px;
+    margin-top: 20px;
+    border-radius: 12px;
+    background: #020617;
+}
+
+/* Order */
+#order {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #38bdf8;
+}
+
+/* Legend */
+.legend {
+    margin-top: 10px;
+}
+
+.legend span {
+    padding: 5px 12px;
+    border-radius: 6px;
+    margin-right: 10px;
+}
+
+.locked { background:#64748b; }
+.unlocked { background:#22c55e; }
+.done { background:#3b82f6; }
+
+/* Error */
+.error {
+    color: #ef4444;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Learning Path Generator (DAG)</h2>
+
+<p>Format: Subject : prereq1, prereq2</p>
+
+<textarea id="subjects">
+Machine Learning : Probability
+Deep Learning : Machine Learning
+Probability :
+Operating Systems : Data Structures
+Data Structures :
+</textarea>
+
+<br>
+<button onclick="generateGraph()">Generate</button>
+<button onclick="resetProgress()">Reset</button>
+
+<div id="order"></div>
+
+<div class="legend">
+<span class="locked">Locked</span>
+<span class="unlocked">Unlocked</span>
+<span class="done">Completed</span>
+</div>
+
+<div id="network"></div>
+
+</div>
+
+<script>
+
+// ===== SAME LOGIC (UI UPGRADED ONLY) =====
+
+let completed = new Set(JSON.parse(localStorage.getItem("progress") || "[]"));
+
+let adjacency = {};
+let reverseAdj = {};
+let nodes = {};
+let edges = [];
+
+let container = document.getElementById("network");
+
+let network = new vis.Network(container, {
+    nodes: new vis.DataSet([]),
+    edges: new vis.DataSet([])
+},{
+    layout:{hierarchical:{direction:"LR"}},
+    edges:{arrows:"to", color:"#38bdf8"},
+    physics:false
+});
+
+function generateGraph(){
+
+adjacency = {};
+reverseAdj = {};
+nodes = {};
+edges = [];
+
+let input = document.getElementById("subjects").value;
+
+if(!input.trim()){
+    showError("Input cannot be empty");
+    return;
+}
+
+let lines = input.split("\n").map(l=>l.trim()).filter(l=>l);
+
+let id = 1;
+
+function getNode(name){
+    name = name.toLowerCase();
+    if(!nodes[name]) nodes[name] = id++;
+    return nodes[name];
+}
+
+// BUILD GRAPH
+for(let line of lines){
+
+    if(!line.includes(":")){
+        showError("Invalid format");
+        return;
+    }
+
+    let [subject, prereqStr] = line.split(":");
+    subject = subject.trim().toLowerCase();
+
+    getNode(subject);
+
+    adjacency[subject] = adjacency[subject] || [];
+    reverseAdj[subject] = reverseAdj[subject] || [];
+
+    if(prereqStr){
+        let prereqs = prereqStr.split(",");
+
+        for(let p of prereqs){
+            let pre = p.trim().toLowerCase();
+            if(pre){
+                getNode(pre);
+
+                adjacency[pre] = adjacency[pre] || [];
+                adjacency[pre].push(subject);
+
+                reverseAdj[subject].push(pre);
+
+                edges.push({
+                    from:nodes[pre],
+                    to:nodes[subject]
+                });
+            }
+        }
+    }
+}
+
+// DFS cycle detection
+let visited = {}, stack = {};
+
+function dfs(node){
+    visited[node] = true;
+    stack[node] = true;
+
+    for(let nei of (adjacency[node]||[])){
+        if(!visited[nei] && dfs(nei)) return true;
+        if(stack[nei]) return true;
+    }
+
+    stack[node] = false;
+    return false;
+}
+
+for(let n in adjacency){
+    if(!visited[n]){
+        if(dfs(n)){
+            showError("Cycle detected!");
+            return;
+        }
+    }
+}
+
+// Kahn's algorithm
+let indegree = {};
+for(let n in adjacency) indegree[n] = 0;
+
+for(let n in adjacency){
+    adjacency[n].forEach(v => indegree[v]++);
+}
+
+let queue = [];
+for(let n in indegree){
+    if(indegree[n] === 0) queue.push(n);
+}
+
+let topo = [];
+
+while(queue.length){
+    let cur = queue.shift();
+    topo.push(cur);
+
+    for(let nei of (adjacency[cur]||[])){
+        indegree[nei]--;
+        if(indegree[nei] === 0) queue.push(nei);
+    }
+}
+
+document.getElementById("order").innerHTML =
+"Study Order: " + topo.join(" → ");
+
+// Node coloring
+function isUnlocked(node){
+    return (reverseAdj[node]||[]).every(p => completed.has(p));
+}
+
+let nodeArray = [];
+
+for(let n in nodes){
+
+    let color = "#64748b";
+
+    if(isUnlocked(n)) color = "#22c55e";
+    if(completed.has(n)) color = "#3b82f6";
+
+    nodeArray.push({
+        id:nodes[n],
+        label:n,
+        shape:"box",
+        color:{background:color},
+        font:{color:"white"}
+    });
+}
+
+// update graph
+network.setData({
+    nodes:new vis.DataSet(nodeArray),
+    edges:new vis.DataSet(edges)
+});
+
+clearError();
+}
+
+// click interaction
+network.on("click", function(params){
+
+    if(params.nodes.length === 0) return;
+
+    let idClicked = params.nodes[0];
+    let name = Object.keys(nodes).find(k => nodes[k] === idClicked);
+
+    if(completed.has(name)){
+        completed.delete(name);
+    }
+    else{
+        if(!(reverseAdj[name]||[]).every(p => completed.has(p))){
+            alert("Finish prerequisites first");
+            return;
+        }
+        completed.add(name);
+    }
+
+    localStorage.setItem("progress", JSON.stringify([...completed]));
+    generateGraph();
+});
+
+// reset
+function resetProgress(){
+    completed = new Set();
+    localStorage.removeItem("progress");
+    generateGraph();
+}
+
+// error
+function showError(msg){
+    document.getElementById("order").innerHTML =
+    "<span class='error'>" + msg + "</span>";
+}
+
+function clearError(){}
+
+</script>
+
+</body>
+</html>
